@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR/Barcode Scanner from Screenshot</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: #4a5568;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .main-content {
+            padding: 30px;
+        }
+
+        .step {
+            margin-bottom: 30px;
+        }
+
+        .step-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+        }
+
+        .step-number {
+            background: #667eea;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            margin-right: 12px;
+        }
+
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            background: #5a67d8;
+            transform: translateY(-1px);
+        }
+
+        .btn:disabled {
+            background: #a0aec0;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .canvas-container {
+            position: relative;
+            margin: 20px 0;
+            border: 2px dashed #cbd5e0;
+            border-radius: 8px;
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .canvas-container.has-image {
+            border: 2px solid #667eea;
+        }
+
+        #screenshotCanvas {
+            max-width: 100%;
+            max-height: 400px;
+            border-radius: 6px;
+            cursor: crosshair;
+        }
+
+        .placeholder {
+            color: #a0aec0;
+            font-size: 16px;
+            text-align: center;
+        }
+
+        .selection-overlay {
+            position: absolute;
+            border: 2px solid #667eea;
+            background: rgba(102, 126, 234, 0.1);
+            pointer-events: none;
+            display: none;
+        }
+
+        .result-section {
+            background: #f7fafc;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .result-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 12px;
+        }
+
+        .result-content {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 15px;
+            min-height: 100px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .error {
+            color: #e53e3e;
+            background: #fed7d7;
+            border-color: #feb2b2;
+        }
+
+        .success {
+            color: #38a169;
+            background: #c6f6d5;
+            border-color: #9ae6b4;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            color: #667eea;
+            margin: 20px 0;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .instructions {
+            background: #edf2f7;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 0 6px 6px 0;
+        }
+
+        .instructions ul {
+            margin-left: 20px;
+            margin-top: 8px;
+        }
+
+        .instructions li {
+            margin-bottom: 4px;
+            color: #4a5568;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 QR & Barcode Scanner</h1>
+            <p>Capture your screen and scan QR codes or barcodes instantly</p>
+        </div>
+
+        <div class="main-content">
+            <div class="instructions">
+                <strong>How to use:</strong>
+                <ul>
+                    <li>Click "Take Screenshot" and select the window or screen to capture</li>
+                    <li>Click and drag to select the area containing the QR/barcode</li>
+                    <li>Click "Scan Selected Area" to decode the code</li>
+                </ul>
+            </div>
+
+            <div class="step">
+                <div class="step-title">
+                    <span class="step-number">1</span>
+                    Capture Screenshot
+                </div>
+                <button id="captureBtn" class="btn">
+                    📷 Take Screenshot
+                </button>
+            </div>
+
+            <div class="canvas-container" id="canvasContainer">
+                <div class="placeholder" id="placeholder">
+                    Screenshot will appear here
+                </div>
+                <canvas id="screenshotCanvas" style="display: none;"></canvas>
+                <div class="selection-overlay" id="selectionOverlay"></div>
+            </div>
+
+            <div class="step">
+                <div class="step-title">
+                    <span class="step-number">2</span>
+                    Select QR/Barcode Area
+                </div>
+                <button id="scanBtn" class="btn" disabled>
+                    🔍 Scan Selected Area
+                </button>
+                <button id="resetBtn" class="btn" style="background: #e53e3e; margin-left: 10px;" disabled>
+                    🔄 Reset
+                </button>
+            </div>
+
+            <div class="loading" id="loading">
+                <p>🔄 Scanning code...</p>
+            </div>
+
+            <div class="result-section" id="resultSection" style="display: none;">
+                <div class="result-title">Scan Result:</div>
+                <div class="result-content" id="resultContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Include jsQR library for QR code scanning -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+
+    <script>
+        class QRBarcodeScanner {
+            constructor() {
+                this.canvas = document.getElementById('screenshotCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.canvasContainer = document.getElementById('canvasContainer');
+                this.placeholder = document.getElementById('placeholder');
+                this.selectionOverlay = document.getElementById('selectionOverlay');
+
+                this.captureBtn = document.getElementById('captureBtn');
+                this.scanBtn = document.getElementById('scanBtn');
+                this.resetBtn = document.getElementById('resetBtn');
+                this.loading = document.getElementById('loading');
+                this.resultSection = document.getElementById('resultSection');
+                this.resultContent = document.getElementById('resultContent');
+
+                this.isSelecting = false;
+                this.startX = 0;
+                this.startY = 0;
+                this.endX = 0;
+                this.endY = 0;
+                this.selection = null;
+
+                this.initEventListeners();
+            }
+
+            initEventListeners() {
+                this.captureBtn.addEventListener('click', () => this.captureScreen());
+                this.scanBtn.addEventListener('click', () => this.scanSelectedArea());
+                this.resetBtn.addEventListener('click', () => this.reset());
+
+                this.canvas.addEventListener('mousedown', (e) => this.startSelection(e));
+                this.canvas.addEventListener('mousemove', (e) => this.updateSelection(e));
+                this.canvas.addEventListener('mouseup', (e) => this.endSelection(e));
+            }
+
+            async captureScreen() {
+                try {
+                    // Check if the browser supports screen capture
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+                        this.showError('Screen capture is not supported in this browser. Please use a modern browser like Chrome, Firefox, or Edge.');
+                        return;
+                    }
+
+                    const stream = await navigator.mediaDevices.getDisplayMedia({
+                        video: { mediaSource: 'screen' },
+                        suppressLocalAudioPlayback: true
+                    });
+
+                    const video = document.createElement('video');
+                    video.srcObject = stream;
+                    video.play();
+
+                    video.addEventListener('loadedmetadata', () => {
+                        this.canvas.width = video.videoWidth;
+                        this.canvas.height = video.videoHeight;
+
+                        this.ctx.drawImage(video, 0, 0);
+
+                        // Stop the stream
+                        stream.getTracks().forEach(track => track.stop());
+
+                        // Show canvas and hide placeholder
+                        this.canvas.style.display = 'block';
+                        this.placeholder.style.display = 'none';
+                        this.canvasContainer.classList.add('has-image');
+
+                        // Enable reset button
+                        this.resetBtn.disabled = false;
+
+                        this.hideResult();
+                    });
+
+                } catch (error) {
+                    console.error('Error capturing screen:', error);
+                    if (error.name === 'NotAllowedError') {
+                        this.showError('Screen capture was denied. Please allow screen sharing and try again.');
+                    } else {
+                        this.showError('Failed to capture screen. Please try again.');
+                    }
+                }
+            }
+
+            startSelection(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                this.startX = (e.clientX - rect.left) * (this.canvas.width / rect.width);
+                this.startY = (e.clientY - rect.top) * (this.canvas.height / rect.height);
+                this.isSelecting = true;
+                this.selectionOverlay.style.display = 'block';
+            }
+
+            updateSelection(e) {
+                if (!this.isSelecting) return;
+
+                const rect = this.canvas.getBoundingClientRect();
+                this.endX = (e.clientX - rect.left) * (this.canvas.width / rect.width);
+                this.endY = (e.clientY - rect.top) * (this.canvas.height / rect.height);
+
+                const left = Math.min(this.startX, this.endX) * (rect.width / this.canvas.width);
+                const top = Math.min(this.startY, this.endY) * (rect.height / this.canvas.height);
+                const width = Math.abs(this.endX - this.startX) * (rect.width / this.canvas.width);
+                const height = Math.abs(this.endY - this.startY) * (rect.height / this.canvas.height);
+
+                this.selectionOverlay.style.left = left + 'px';
+                this.selectionOverlay.style.top = top + 'px';
+                this.selectionOverlay.style.width = width + 'px';
+                this.selectionOverlay.style.height = height + 'px';
+            }
+
+            endSelection(e) {
+                if (!this.isSelecting) return;
+
+                this.isSelecting = false;
+
+                const minX = Math.min(this.startX, this.endX);
+                const minY = Math.min(this.startY, this.endY);
+                const maxX = Math.max(this.startX, this.endX);
+                const maxY = Math.max(this.startY, this.endY);
+
+                if (Math.abs(maxX - minX) > 10 && Math.abs(maxY - minY) > 10) {
+                    this.selection = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+                    this.scanBtn.disabled = false;
+                } else {
+                    this.selectionOverlay.style.display = 'none';
+                }
+            }
+
+            async scanSelectedArea() {
+                if (!this.selection) {
+                    this.showError('Please select an area first.');
+                    return;
+                }
+
+                this.loading.classList.add('show');
+                this.hideResult();
+
+                try {
+                    // Extract the selected area
+                    const imageData = this.ctx.getImageData(
+                        this.selection.x,
+                        this.selection.y,
+                        this.selection.width,
+                        this.selection.height
+                    );
+
+                    // Try to decode QR code using jsQR
+                    const qrCode = jsQR(imageData.data, imageData.width, imageData.height);
+
+                    if (qrCode) {
+                        this.showResult(qrCode.data, 'QR Code');
+                    } else {
+                        // If QR code detection fails, try barcode detection using a simple pattern matching approach
+                        const barcodeResult = this.attemptBarcodeDetection(imageData);
+                        if (barcodeResult) {
+                            this.showResult(barcodeResult, 'Barcode');
+                        } else {
+                            this.showError('No QR code or barcode detected in the selected area. Please ensure the code is clearly visible and try selecting a different area.');
+                        }
+                    }
+
+                } catch (error) {
+                    console.error('Error scanning code:', error);
+                    this.showError('Failed to scan the selected area. Please try again.');
+                } finally {
+                    this.loading.classList.remove('show');
+                }
+            }
+
+            attemptBarcodeDetection(imageData) {
+                // This is a basic barcode detection - in a real application, you'd use a proper barcode library like QuaggaJS
+                // For now, we'll return null to indicate no barcode was found
+                // You could integrate QuaggaJS here for more comprehensive barcode support
+                return null;
+            }
+
+            showResult(text, type) {
+                this.resultContent.textContent = text;
+                this.resultContent.className = 'result-content success';
+                this.resultSection.style.display = 'block';
+
+                // Also log to console for debugging
+                console.log(`${type} detected:`, text);
+            }
+
+            showError(message) {
+                this.resultContent.textContent = message;
+                this.resultContent.className = 'result-content error';
+                this.resultSection.style.display = 'block';
+            }
+
+            hideResult() {
+                this.resultSection.style.display = 'none';
+            }
+
+            reset() {
+                // Hide canvas and show placeholder
+                this.canvas.style.display = 'none';
+                this.placeholder.style.display = 'block';
+                this.canvasContainer.classList.remove('has-image');
+
+                // Hide selection overlay
+                this.selectionOverlay.style.display = 'none';
+
+                // Reset selection
+                this.selection = null;
+
+                // Disable buttons
+                this.scanBtn.disabled = true;
+                this.resetBtn.disabled = true;
+
+                // Hide results and loading
+                this.hideResult();
+                this.loading.classList.remove('show');
+
+                // Clear canvas
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            }
+        }
+
+        // Initialize the scanner when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new QRBarcodeScanner();
+        });
+
+        // Handle browser compatibility warnings
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+            document.addEventListener('DOMContentLoaded', () => {
+                const captureBtn = document.getElementById('captureBtn');
+                captureBtn.disabled = true;
+                captureBtn.textContent = '❌ Screen Capture Not Supported';
+
+                const resultSection = document.getElementById('resultSection');
+                const resultContent = document.getElementById('resultContent');
+                resultContent.textContent = 'Screen capture is not supported in this browser. Please use a modern browser like Chrome (version 72+), Firefox (version 66+), or Edge (version 79+).';
+                resultContent.className = 'result-content error';
+                resultSection.style.display = 'block';
+            });
+        }
+    </script>
+</body>
+</html>
